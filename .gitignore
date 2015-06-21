@@ -4,3 +4,6 @@ tmpout/*.xml
 annotations/*.xml
 scraper.exe
 scraper.exe.mdb
+.idea/
+*.iml
+out/
