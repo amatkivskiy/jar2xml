@@ -24,11 +24,6 @@
 
 package jar2xml;
 
-import java.io.File;
-import java.io.OutputStreamWriter;
-import java.io.FileOutputStream;
-import java.util.List;
-import java.util.ArrayList;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -36,10 +31,19 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.List;
+
+import jar2xml.scrapers.AndroidDocScraper;
+import jar2xml.scrapers.DroidDocScraper;
+import jar2xml.scrapers.Java7DocScraper;
+import jar2xml.scrapers.JavaDocScraper;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 public class Start {
 
@@ -99,13 +103,13 @@ public class Start {
 
 		try {
 			if (annots != null)
-				AndroidDocScraper.loadXml (annots);
+				AndroidDocScraper.loadXml(annots);
 			if (droiddocs != null)
-				JavaClass.addDocScraper (new DroidDocScraper (new File (droiddocs)));
+				JavaClass.addDocScraper (new DroidDocScraper(new File (droiddocs)));
 			if (javadocs != null)
-				JavaClass.addDocScraper (new JavaDocScraper (new File (javadocs)));
+				JavaClass.addDocScraper (new JavaDocScraper(new File (javadocs)));
 			if (java7docs != null)
-				JavaClass.addDocScraper (new Java7DocScraper (new File (java7docs)));
+				JavaClass.addDocScraper (new Java7DocScraper(new File (java7docs)));
 		} catch (Exception e) {
 			e.printStackTrace ();
 			System.err.println ("warning J2X8001: Couldn't access javadocs at specified docpath.  Continuing without it...");

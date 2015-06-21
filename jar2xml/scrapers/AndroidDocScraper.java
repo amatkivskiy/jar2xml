@@ -22,43 +22,30 @@
  *  SOFTWARE.
  */
 
-package jar2xml;
+package jar2xml.scrapers;
 
-import java.io.*;
-import java.lang.reflect.*;
-import java.util.regex.*;
-import java.util.*;
-import javax.xml.parsers.*;
-import org.w3c.dom.*;
-import org.objectweb.asm.tree.*;
+import javax.xml.parsers.DocumentBuilderFactory;
 
-class DroidDocScraper extends AndroidDocScraper {
-	static final String pattern_head_droiddoc = "<span class=\"sympad\"><a href=\".*";
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-	public DroidDocScraper (File dir) throws IOException {
-		super (dir, pattern_head_droiddoc, null, null, false);
-	}
-}
-
-class JavaDocScraper extends AndroidDocScraper {
-	static final String pattern_head_javadoc = "<TD><CODE><B><A HREF=\"[./]*"; // I'm not sure how path could be specified... (./ , ../ , or even /)
-	static final String reset_pattern_head_javadoc = "<TD><CODE>";
-	static final String parameter_pair_splitter_javadoc = "&nbsp;";
-
-	public JavaDocScraper (File dir) throws IOException {
-		super (dir, pattern_head_javadoc, reset_pattern_head_javadoc, parameter_pair_splitter_javadoc, false);
-	}
-}
-
-class Java7DocScraper extends AndroidDocScraper {
-	static final String pattern_head_javadoc = "<td class=\"col.+\"><code><strong><a href=\"[./]*"; // I'm not sure how path could be specified... (./ , ../ , or even /)
-	static final String reset_pattern_head_javadoc = "<td><code>";
-	static final String parameter_pair_splitter_javadoc = "&nbsp;";
-
-	public Java7DocScraper (File dir) throws IOException {
-		super (dir, pattern_head_javadoc, reset_pattern_head_javadoc, parameter_pair_splitter_javadoc, true);
-	}
-}
+import jar2xml.IDocScraper;
+import jar2xml.JavaClass;
+import org.objectweb.asm.tree.ClassNode;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 public abstract class AndroidDocScraper implements IDocScraper {
 
@@ -110,7 +97,7 @@ public abstract class AndroidDocScraper implements IDocScraper {
 		for (int i = 0; i < ptypes.length; i++) {
 			if (i != 0)
 				buffer.append (", ");
-			String type = JavaClass.getGenericTypeName (ptypes[i]);
+			String type = JavaClass.getGenericTypeName(ptypes[i]);
 			if (isVarArgs && i == ptypes.length - 1)
 				type = type.replace ("[]", "...");
 			// FIXME: some javadocs (e.g. OSMDroid) seems to cause type name mismatch

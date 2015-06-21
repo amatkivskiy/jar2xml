@@ -39,11 +39,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 import java.util.Locale;
+
+import jar2xml.scrapers.AndroidDocScraper;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
 public class JavaClass implements Comparable<JavaClass> {
@@ -61,7 +61,7 @@ public class JavaClass implements Comparable<JavaClass> {
 	{
 		this.jclass = jclass;
 		this.asm = asm;
-		deprecatedFields = AndroidDocScraper.getDeprecatedFields (asm);
+		deprecatedFields = AndroidDocScraper.getDeprecatedFields(asm);
 		deprecatedMethods = AndroidDocScraper.getDeprecatedMethods (asm);
 		asmFields = new HashMap<String,FieldNode> ();
 
