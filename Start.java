@@ -40,8 +40,8 @@ import java.util.List;
 
 import jar2xml.scrapers.AndroidDocScraper;
 import jar2xml.scrapers.DroidDocScraper;
-import jar2xml.scrapers.Java7DocScraper;
 import jar2xml.scrapers.JavaDocScraper;
+import jar2xml.scrapers.source.SourcesScraper;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -109,7 +109,8 @@ public class Start {
 			if (javadocs != null)
 				JavaClass.addDocScraper (new JavaDocScraper(new File (javadocs)));
 			if (java7docs != null)
-				JavaClass.addDocScraper (new Java7DocScraper(new File (java7docs)));
+				JavaClass.addDocScraper (new SourcesScraper(new File (java7docs)));
+//				JavaClass.addDocScraper (new Java7DocScraper(new File (java7docs)));
 		} catch (Exception e) {
 			e.printStackTrace ();
 			System.err.println ("warning J2X8001: Couldn't access javadocs at specified docpath.  Continuing without it...");
