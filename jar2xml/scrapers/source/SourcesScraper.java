@@ -4,17 +4,22 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import japa.parser.JavaParser;
 import japa.parser.ParseException;
 import japa.parser.ast.CompilationUnit;
 import japa.parser.ast.body.BodyDeclaration;
+import japa.parser.ast.body.ClassOrInterfaceDeclaration;
 import japa.parser.ast.body.ConstructorDeclaration;
 import japa.parser.ast.body.MethodDeclaration;
 import japa.parser.ast.body.Parameter;
 import japa.parser.ast.body.TypeDeclaration;
 import jar2xml.IDocScraper;
+import jar2xml.utils.Utils;
 import org.objectweb.asm.tree.ClassNode;
 
 public class SourcesScraper implements IDocScraper {
@@ -33,31 +38,59 @@ public class SourcesScraper implements IDocScraper {
   }
 
   @Override public String[] getParameterNames(ClassNode asm, String name, Type[] ptypes, boolean isVarArgs) {
-    String fileName = sourcesDir.getPath() + "/";
+    // Check whether we can determine class
+    if (isInnerClassAnonymous(asm)) return EMPTY_RESPONSE;
 
-    if (asm.name.contains("$")) {
-      return EMPTY_RESPONSE;
-//      fileName += asm.name.substring(0, asm.name.indexOf("$"));
-    } else {
-      fileName += asm.name;
-    }
-    fileName += ".java";
+    String fileName = getFileNameForClass(asm);
+    boolean isInnerClass = asm.name.contains("$");
 
     try {
-      List<Parameter> params = getParamsForMethodName(fileName, name, ptypes);
+      List<Parameter> params;
+
+      if (isInnerClass) {
+        if (name.contains(".")) name = name.split("\\.")[1];
+        String className = asm.name.split("\\$")[1];
+
+        params = getParamsForInnerClassMethodName(fileName, className, name, ptypes);
+      } else {
+        params = getParamsForMethodName(fileName, name, ptypes);
+      }
+
       if (params == null) {
+        System.err.println("Not found for " + asm.name + "." + name + "(" + Arrays.toString(ptypes)+ ")");
         return EMPTY_RESPONSE;
       }
+
       return getMethodParamNames(params);
     } catch (FileNotFoundException e) {
       System.err.println(String.format("File {%s} for class {%s} not found.", fileName, asm.name));
     } catch (ParseException e) {
       System.err.println(String.format("Failed to parse file {%s} for class {%s}.", fileName, asm.name));
-    } catch (StringIndexOutOfBoundsException e) {
-      System.err.println("Something went wrong. Need to investigate. File: " + fileName);
+    } catch (StringIndexOutOfBoundsException ignore) {
+      //Got it from japa.parser internal. Need to investigate circumstances.
     }
 
     return EMPTY_RESPONSE;
+  }
+
+  private boolean isInnerClassAnonymous(ClassNode clazz) {
+    if (!clazz.name.contains("$")) return false;
+
+    String innerClassName = clazz.name.split("\\$")[1];
+
+    return innerClassName.matches("[0-9]+");
+  }
+
+  private String getFileNameForClass(ClassNode clazz) {
+    String fileName = sourcesDir.getPath() + "/";
+
+    if (clazz.name.contains("$")) {
+      fileName += clazz.name.split("\\$")[0];
+    } else {
+      fileName += clazz.name;
+    }
+
+    return fileName + ".java";
   }
 
   private String[] getMethodParamNames(List<Parameter> parameters) {
@@ -73,68 +106,55 @@ public class SourcesScraper implements IDocScraper {
     }
   }
 
-  private List<Parameter> getParamsForMethodName(String file, String name, Type[] methodParams) throws FileNotFoundException, ParseException {
+  private List<Parameter> getParamsForInnerClassMethodName(String file, String clazzName, String name, Type[] methodParams)
+      throws FileNotFoundException, ParseException {
     CompilationUnit javaFile = JavaParser.parse(new FileInputStream(file));
-
     TypeDeclaration clazz = javaFile.getTypes().get(0);
 
     for (BodyDeclaration bodyDeclaration : clazz.getMembers()) {
+      if (bodyDeclaration instanceof ClassOrInterfaceDeclaration) {
+        ClassOrInterfaceDeclaration innerClass = (ClassOrInterfaceDeclaration) bodyDeclaration;
+
+        if (innerClass.getName().equals(clazzName)) {
+          return checkAllClassMembers(innerClass.getName(), innerClass.getMembers(), name, methodParams);
+        }
+      }
+    }
+
+    System.err.println(String.format("Method {%s(%s)} not found in {%s}", name, Utils.getMethodParamsString(methodParams), file));
+
+    return null;
+  }
+
+  private List<Parameter> getParamsForMethodName(String file, String name, Type[] methodParams)
+      throws FileNotFoundException, ParseException {
+    CompilationUnit javaFile = JavaParser.parse(new FileInputStream(file));
+
+    TypeDeclaration clazz = javaFile.getTypes().get(0);
+    return checkAllClassMembers(clazz.getName(), clazz.getMembers(), name, methodParams);
+  }
+
+  private List<Parameter> checkAllClassMembers(String clazzName, List<BodyDeclaration> members, String targetMethodName,
+      Type[] targetMethodParams) {
+    for (BodyDeclaration bodyDeclaration : members) {
       if (bodyDeclaration instanceof MethodDeclaration) {
         MethodDeclaration method = (MethodDeclaration) bodyDeclaration;
 
-        if (checkIfMethodMatches(method.getName(), method.getParameters(), name, methodParams)) {
-          System.out.println("Found " + clazz.getName() + "." + method.getName() + "(" + getMethodParamsString(method.getParameters()) + ")");
+        if (checkIfMethodMatches(method.getName(), method.getParameters(), targetMethodName, targetMethodParams)) {
+          System.out.println("Found " + clazzName + "." + method.getName() + "(" + Utils.getMethodParamsString(method.getParameters()) + ")");
           return method.getParameters();
         }
       } else if (bodyDeclaration instanceof ConstructorDeclaration) {
         ConstructorDeclaration constructor = (ConstructorDeclaration) bodyDeclaration;
 
-        if (checkIfMethodMatches(constructor.getName(), constructor.getParameters(), name, methodParams)) {
-          System.out.println("Found " + clazz.getName() + "." + constructor.getName() + "(" + getMethodParamsString(constructor.getParameters()) + ")");
+        if (checkIfMethodMatches(constructor.getName(), constructor.getParameters(), targetMethodName, targetMethodParams)) {
+          System.out.println("Found " + clazzName + "." + constructor.getName() + "(" + Utils.getMethodParamsString(constructor.getParameters()) + ")");
           return constructor.getParameters();
         }
       }
     }
 
-    System.err.println(String.format("Method {%s(%s)} not found in {%s}", name, getMethodParamsString(methodParams), file));
-
     return null;
-  }
-
-  private String getMethodParamsString(Type[] params) {
-    StringBuilder builder = new StringBuilder("");
-
-    if (params.length == 0) {
-      return builder.toString();
-    }
-
-    for (int i = 0; i < params.length; i++) {
-      builder.append(params[i].toString());
-
-      if (i != params.length - 1) {
-        builder.append(",");
-      }
-    }
-
-    return builder.toString();
-  }
-
-  private String getMethodParamsString(List<Parameter> params) {
-    StringBuilder builder = new StringBuilder("");
-
-    if (params == null) {
-      return builder.toString();
-    }
-
-    for (Parameter param : params) {
-      builder.append(param.getId().getName());
-
-      if (params.indexOf(param) != params.size() - 1) {
-        builder.append(",");
-      }
-    }
-
-    return builder.toString();
   }
 
   private boolean checkIfMethodMatches(String methodName, List<Parameter> methodParameters, String targetMethodName,
@@ -152,21 +172,18 @@ public class SourcesScraper implements IDocScraper {
   }
 
   private boolean checkIfParamsMatches(List<Parameter> methodParams, Type[] pTypes) {
-    for (Parameter parameter : methodParams) {
-      boolean doesMatches = false;
-
-      for (Type pType : pTypes) {
-        //TODO: optimize this ugly algo!!!
-        //TODO: Maybe there is need to check whether full type names match each other rather than only short type name
-        //TODO:  like Request and com.squareup.picasso.Request
-        String pTypeWithDots = pType.toString().replace("$", ".");
-        doesMatches = doesMatches || pTypeWithDots.contains(parameter.getType().toString());
-      }
-
-      if (!doesMatches) {
-        return false;
-      }
+    List<String> convertedParams = new ArrayList<>(methodParams.size());
+    for (Parameter methodParam : methodParams) {
+      convertedParams.add(methodParam.getType().toString());
     }
-    return true;
+    Collections.sort(convertedParams);
+
+    List<String> convertedTypes = new ArrayList<>(pTypes.length);
+    for (Type pType : pTypes) {
+      convertedTypes.add(Utils.getShortTypeName(pType));
+    }
+    Collections.sort(convertedTypes);
+
+    return convertedTypes.equals(convertedParams);
   }
 }
