@@ -7,9 +7,18 @@ import japa.parser.ast.body.Parameter;
 
 public class Utils {
   public static String getShortTypeName(Type type) {
-    String fullName = type.toString();
+//    Some methods don't use inner class names with outer class names
+//    For example: Some classes use Bitmap.Config but other use Listener (real type us Picasso.Listener)
+//
+//  Type : interface com.squareup.picasso.Picasso$Listener
+//  Parameter : Listener
 
-    String shortName = fullName.replace("$", ".");
+    String shortName = type.toString();
+
+    if (shortName.contains(".")) {
+      String[] parts = shortName.split("\\.");
+      shortName = parts[parts.length - 1];
+    }
 
     if (shortName.contains("class ")) {
       shortName = shortName.replace("class ", "");
@@ -19,10 +28,7 @@ public class Utils {
       shortName= shortName.replace("interface ", "");
     }
 
-    if (shortName.contains(".")) {
-      String[] parts = shortName.split("\\.");
-      shortName = parts[parts.length - 1];
-    }
+    shortName = shortName.replace("$", ".");
 
     return shortName;
   }
